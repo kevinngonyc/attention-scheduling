@@ -1,6 +1,5 @@
 #include <string>
-
-struct QKV;
+#include "qkv.cuh"
 
 QKV* createQKV(const int* cu_seqlens, int num_seqs, int d_k, int d_v);
 void printQKV(const QKV* m, int rows, int cols);

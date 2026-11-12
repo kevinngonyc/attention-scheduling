@@ -1,0 +1,3 @@
+#define THREADS_PER_BLOCK 256
+#define TILE_ROWS 64
+#define HEAD_DIM 64
