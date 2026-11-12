@@ -2,6 +2,7 @@
 #include <vector>
 #include <cuda_fp16.h>
 #include <string>
+#include <sys/stat.h>
 #include "generate.h"
 #include "config.h"
 #include "utils.h"
@@ -15,18 +16,18 @@ __global__ void fill(__half* p, int n, int offset) {
     }
 }
 
-QKV* createQKV(const int* cu_seqlens, int num_seqs, int d_k, int d_v) {
+QKV* createQKV(const int* cu_seqlens, int num_seqs) {
     QKV* m = new QKV;
     m->num_seqs = num_seqs;
     m->tokens = cu_seqlens[num_seqs];
-    m->d_k = d_k;
-    m->d_v = d_v;
+    m->d_k = HEAD_DIM;
+    m->d_v = HEAD_DIM;
 
     cudaMalloc(&m->cu_seqlens, (num_seqs + 1) * sizeof(int));
     cudaMemcpy(m->cu_seqlens, cu_seqlens, (num_seqs + 1) * sizeof(int), cudaMemcpyHostToDevice);
 
-    int n_qk = m->tokens * d_k;
-    int n_v  = m->tokens * d_v;
+    int n_qk = m->tokens * HEAD_DIM;
+    int n_v  = m->tokens * HEAD_DIM;
 
     cudaMalloc(&m->q, n_qk * sizeof(__half));
     cudaMalloc(&m->k, n_qk * sizeof(__half));
@@ -54,6 +55,7 @@ void freeQKV(QKV* m) {
 }
 
 void saveQKV(const QKV* m, const std::string& dir) {
+    mkdir(dir.c_str(), 0755);
     saveData(dir, "q.bin", m->q, (size_t)m->tokens * m->d_k * sizeof(__half));
     saveData(dir, "k.bin", m->k, (size_t)m->tokens * m->d_k * sizeof(__half));
     saveData(dir, "v.bin", m->v, (size_t)m->tokens * m->d_v * sizeof(__half));

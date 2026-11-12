@@ -1,3 +1,5 @@
+#include <fstream>
+#include <sstream>
 #include "workload.h"
 #include "config.h"
 
@@ -17,4 +19,18 @@ std::vector<int> makeCuSeqlens(const std::vector<int>& seqlens) {
     std::vector<int> cu = {0};
     for (int len : seqlens) cu.push_back(cu.back() + len);
     return cu;
+}
+
+std::vector<std::vector<int>> readWorkloads(const std::string& path) {
+    std::ifstream f(path);
+    std::vector<std::vector<int>> workloads;
+    std::string line;
+    while (std::getline(f, line)) {
+        std::istringstream nums(line);
+        std::vector<int> seqlens;
+        int len;
+        while (nums >> len) seqlens.push_back(len);
+        workloads.push_back(seqlens);
+    }
+    return workloads;
 }

@@ -1,4 +1,5 @@
 #include "workload.h"
-#include "qkv.cuh"
+
+struct QKV;
 
 void runAttention(QKV* m, const std::vector<Tile>& tiles);
