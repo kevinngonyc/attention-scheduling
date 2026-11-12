@@ -2,7 +2,6 @@
 #include <vector>
 #include <cuda_fp16.h>
 #include <string>
-#include <sys/stat.h>
 #include "generate.h"
 #include "config.h"
 #include "utils.h"
@@ -55,10 +54,10 @@ void freeQKV(QKV* m) {
 }
 
 void saveQKV(const QKV* m, const std::string& dir) {
-    mkdir(dir.c_str(), 0755);
     saveData(dir, "q.bin", m->q, (size_t)m->tokens * m->d_k * sizeof(__half));
     saveData(dir, "k.bin", m->k, (size_t)m->tokens * m->d_k * sizeof(__half));
     saveData(dir, "v.bin", m->v, (size_t)m->tokens * m->d_v * sizeof(__half));
     saveData(dir, "o.bin", m->o, (size_t)m->tokens * m->d_v * sizeof(__half));
     saveData(dir, "cu_seqlens.bin", m->cu_seqlens, (m->num_seqs + 1) * sizeof(int));
+    printf("Saved!\n");
 }

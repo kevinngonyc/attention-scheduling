@@ -2,9 +2,9 @@
 #include <vector>
 #include <cuda_fp16.h>
 
-void printMatrix(const __half* data, int stride, int rows, int cols) {
+void printMatrix(const __half* matrix, int stride, int rows, int cols) {
     std::vector<__half> h(rows * stride);
-    cudaMemcpy(h.data(), data, rows * stride * sizeof(__half), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h.data(), matrix, rows * stride * sizeof(__half), cudaMemcpyDeviceToHost);
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++)
             printf("%7.3f ", __half2float(h[r * stride + c]));

@@ -2,4 +2,4 @@
 
 struct QKV;
 
-void runAttention(QKV* m, const std::vector<Tile>& tiles);
+float runAttention(QKV* m, const std::vector<Tile>& tiles);

@@ -2,6 +2,7 @@
 #include "config.h"
 #include "workload.h"
 #include "qkv.cuh"
+#define RUNS 20
 
 __global__ void attention(
     const __half* Q, 
@@ -59,15 +60,32 @@ __global__ void attention(
         O[row * HEAD_DIM + d] = __float2half(out[d] / weight_sum);
 }
 
-void runAttention(QKV* m, const std::vector<Tile>& tiles) {
+float runAttention(QKV* m, const std::vector<Tile>& tiles) {
     Tile* tile_data;
     size_t bytes = tiles.size() * sizeof(Tile);
     cudaMalloc(&tile_data, bytes);
     cudaMemcpy(tile_data, tiles.data(), bytes, cudaMemcpyHostToDevice);
 
-    // One block per tile, one thread per row
+    // run kernel once for GPU clock ramp-up
     attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
     cudaDeviceSynchronize();
 
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+    for (int r = 0; r < RUNS; r++)
+        attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float ms;
+    cudaEventElapsedTime(&ms, start, stop);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
     cudaFree(tile_data);
+    return ms / RUNS;
 }
