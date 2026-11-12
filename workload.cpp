@@ -5,7 +5,7 @@
 
 std::vector<Tile> makeTiles(const std::vector<int>& cu_seqlens) {
     std::vector<Tile> tiles;
-    int num_seqs = cu_seqlens.size();
+    int num_seqs = cu_seqlens.size() - 1;
     for (int s = 0; s < num_seqs; s++) {
         int seq_start = cu_seqlens[s], seq_end = cu_seqlens[s + 1];
         for (int r = seq_start; r < seq_end; r += TILE_ROWS) {

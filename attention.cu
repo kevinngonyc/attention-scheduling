@@ -1,6 +1,7 @@
 #include <cuda_fp16.h>
 #include "config.h"
 #include "workload.h"
+#include "utils.h"
 #include "qkv.cuh"
 #define RUNS 20
 
@@ -68,23 +69,24 @@ float runAttention(QKV* m, const std::vector<Tile>& tiles) {
 
     // run kernel once for GPU clock ramp-up
     attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
-    cudaDeviceSynchronize();
+    check(cudaDeviceSynchronize());
+    
 
     cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    check(cudaEventCreate(&start));
+    check(cudaEventCreate(&stop));
 
-    cudaEventRecord(start);
+    check(cudaEventRecord(start));
     for (int r = 0; r < RUNS; r++)
         attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    check(cudaEventRecord(stop));
+    check(cudaEventSynchronize(stop));
 
     float ms;
-    cudaEventElapsedTime(&ms, start, stop);
+    check(cudaEventElapsedTime(&ms, start, stop));
 
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    check(cudaEventDestroy(start));
+    check(cudaEventDestroy(stop));
 
     cudaFree(tile_data);
     return ms / RUNS;

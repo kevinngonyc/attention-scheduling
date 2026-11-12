@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
 
         std::string qkv_output = output_dir + "/workload_" + std::to_string(w);
         std::filesystem::create_directories(qkv_output);
-        saveQKV(m, qkv_output);
+        // saveQKV(m, qkv_output);
         freeQKV(m);
     }
 }
