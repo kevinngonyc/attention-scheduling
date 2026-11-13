@@ -1,13 +1,12 @@
 #include <string>
 #include <vector>
-#include <cuda_fp16.h>
 
-void printMatrix(const __half* matrix, int stride, int rows, int cols) {
-    std::vector<__half> h(rows * stride);
-    cudaMemcpy(h.data(), matrix, rows * stride * sizeof(__half), cudaMemcpyDeviceToHost);
+void printMatrix(const float* matrix, int stride, int rows, int cols) {
+    std::vector<float> h(rows * stride);
+    cudaMemcpy(h.data(), matrix, rows * stride * sizeof(float), cudaMemcpyDeviceToHost);
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++)
-            printf("%7.3f ", __half2float(h[r * stride + c]));
+            printf("%7.3f ", h[r * stride + c]);
         printf("\n");
     }
 }

@@ -1,4 +1,3 @@
-#include <cuda_fp16.h>
 #include "config.h"
 #include "workload.h"
 #include "utils.h"
@@ -6,14 +5,14 @@
 #define RUNS 20
 
 __global__ void attention(
-    const __half* Q, 
-    const __half* K, 
-    const __half* V,
-    __half* O, 
+    const float* Q, 
+    const float* K, 
+    const float* V,
+    float* O, 
     const Tile* tiles
 ) {
-    __shared__ __half K_shared[TILE_ROWS * HEAD_DIM];
-    __shared__ __half V_shared[TILE_ROWS * HEAD_DIM];
+    __shared__ float K_shared[TILE_ROWS * HEAD_DIM];
+    __shared__ float V_shared[TILE_ROWS * HEAD_DIM];
 
     Tile t = tiles[blockIdx.x];
     int row = t.q_start + threadIdx.x;
@@ -23,7 +22,7 @@ __global__ void attention(
 
     float q[HEAD_DIM];
     if (active) for (int d = 0; d < HEAD_DIM; d++)
-        q[d] = __half2float(Q[row * HEAD_DIM + d]) * scale;
+        q[d] = Q[row * HEAD_DIM + d] * scale;
 
     float max_score = -INFINITY;
     float weight_sum = 0.0f;
@@ -43,14 +42,14 @@ __global__ void attention(
             for (int j = 0; j < n; j++) {
                 float score = 0.0f;
                 for (int d = 0; d < HEAD_DIM; d++)
-                    score += q[d] * __half2float(K_shared[j * HEAD_DIM + d]);
+                    score += q[d] * K_shared[j * HEAD_DIM + d];
 
                 float new_max = fmaxf(max_score, score);
                 float correction = expf(max_score - new_max);
                 float weight = expf(score - new_max);
                 weight_sum = weight_sum * correction + weight;
                 for (int d = 0; d < HEAD_DIM; d++)
-                    out[d] = out[d] * correction + weight * __half2float(V_shared[j * HEAD_DIM + d]);
+                    out[d] = out[d] * correction + weight * V_shared[j * HEAD_DIM + d];
                 max_score = new_max;
             }
         }
@@ -58,7 +57,7 @@ __global__ void attention(
     }
 
     if (active) for (int d = 0; d < HEAD_DIM; d++)
-        O[row * HEAD_DIM + d] = __float2half(out[d] / weight_sum);
+        O[row * HEAD_DIM + d] = out[d] / weight_sum;
 }
 
 float runAttention(QKV* m, const std::vector<Tile>& tiles) {
@@ -69,24 +68,23 @@ float runAttention(QKV* m, const std::vector<Tile>& tiles) {
 
     // run kernel once for GPU clock ramp-up
     attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
-    check(cudaDeviceSynchronize());
-    
+    cudaDeviceSynchronize();
 
     cudaEvent_t start, stop;
-    check(cudaEventCreate(&start));
-    check(cudaEventCreate(&stop));
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
-    check(cudaEventRecord(start));
+    cudaEventRecord(start);
     for (int r = 0; r < RUNS; r++)
         attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
-    check(cudaEventRecord(stop));
-    check(cudaEventSynchronize(stop));
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
 
     float ms;
-    check(cudaEventElapsedTime(&ms, start, stop));
+    cudaEventElapsedTime(&ms, start, stop);
 
-    check(cudaEventDestroy(start));
-    check(cudaEventDestroy(stop));
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     cudaFree(tile_data);
     return ms / RUNS;

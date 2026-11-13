@@ -1,17 +1,16 @@
 #include <cstdio>
 #include <vector>
-#include <cuda_fp16.h>
 #include <string>
 #include "generate.h"
 #include "config.h"
 #include "utils.h"
 #include "qkv.cuh"
 
-__global__ void fill(__half* p, int n, int offset) {
+__global__ void fill(float* matrix, int n, int offset) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         unsigned x = (unsigned)(i + offset) * 2654435761u; // magic number used in cryptography
-        p[i] = __float2half((x >> 16) / 32768.0f - 1.0f);
+        matrix[i] = (x >> 16) / 32768.0f - 1.0f;
     }
 }
 
@@ -28,10 +27,10 @@ QKV* createQKV(const int* cu_seqlens, int num_seqs) {
     int n_qk = m->tokens * HEAD_DIM;
     int n_v  = m->tokens * HEAD_DIM;
 
-    cudaMalloc(&m->q, n_qk * sizeof(__half));
-    cudaMalloc(&m->k, n_qk * sizeof(__half));
-    cudaMalloc(&m->v, n_v  * sizeof(__half));
-    cudaMalloc(&m->o, n_v  * sizeof(__half));
+    cudaMalloc(&m->q, n_qk * sizeof(float));
+    cudaMalloc(&m->k, n_qk * sizeof(float));
+    cudaMalloc(&m->v, n_v  * sizeof(float));
+    cudaMalloc(&m->o, n_v  * sizeof(float));
 
     fill<<<(n_qk + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(m->q, n_qk, 0);
     fill<<<(n_qk + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(m->k, n_qk, n_qk);
@@ -54,10 +53,10 @@ void freeQKV(QKV* m) {
 }
 
 void saveQKV(const QKV* m, const std::string& dir) {
-    saveData(dir, "q.bin", m->q, (size_t)m->tokens * m->d_k * sizeof(__half));
-    saveData(dir, "k.bin", m->k, (size_t)m->tokens * m->d_k * sizeof(__half));
-    saveData(dir, "v.bin", m->v, (size_t)m->tokens * m->d_v * sizeof(__half));
-    saveData(dir, "o.bin", m->o, (size_t)m->tokens * m->d_v * sizeof(__half));
+    saveData(dir, "q.bin", m->q, (size_t)m->tokens * m->d_k * sizeof(float));
+    saveData(dir, "k.bin", m->k, (size_t)m->tokens * m->d_k * sizeof(float));
+    saveData(dir, "v.bin", m->v, (size_t)m->tokens * m->d_v * sizeof(float));
+    saveData(dir, "o.bin", m->o, (size_t)m->tokens * m->d_v * sizeof(float));
     saveData(dir, "cu_seqlens.bin", m->cu_seqlens, (m->num_seqs + 1) * sizeof(int));
     printf("Saved!\n");
 }
