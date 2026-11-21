@@ -2,4 +2,5 @@
 
 struct QKV;
 
-float runAttention(QKV* m, const std::vector<Tile>& tiles);
+float runPrecomputedAttention(QKV* m, const std::vector<Tile>& tiles, const std::vector<int>& schedule);
+int maxBlocks();

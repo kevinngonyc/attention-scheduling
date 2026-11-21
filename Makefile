@@ -15,7 +15,7 @@ LDFLAGS=-L/usr/local/cuda-11.7/lib64/ -lcudart
 NVCC=nvcc
 NVCCFLAGS=-O3 -m64 --gpu-architecture compute_61 -ccbin /usr/bin/g++-11
 
-OBJS=$(OBJDIR)/main.o $(OBJDIR)/workload.o $(OBJDIR)/utils.o $(OBJDIR)/generate.o $(OBJDIR)/attention.o
+OBJS=$(OBJDIR)/main.o $(OBJDIR)/workload.o $(OBJDIR)/inspector.o $(OBJDIR)/utils.o $(OBJDIR)/generate.o $(OBJDIR)/attention.o
 
 .PHONY: dirs clean
 

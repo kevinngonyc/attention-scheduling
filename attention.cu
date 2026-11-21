@@ -4,25 +4,24 @@
 #include "qkv.cuh"
 #define RUNS 20
 
-__global__ void attention(
+__device__ void processTile(
     const float* Q, 
     const float* K, 
     const float* V,
     float* O, 
-    const Tile* tiles
+    const Tile& t,
+    float* K_shared,
+    float* V_shared
 ) {
-    __shared__ float K_shared[TILE_ROWS * HEAD_DIM];
-    __shared__ float V_shared[TILE_ROWS * HEAD_DIM];
-
-    Tile t = tiles[blockIdx.x];
     int row = t.q_start + threadIdx.x;
     bool active = row < t.q_end;
 
     float scale = 1.0f / sqrtf((float)HEAD_DIM);
 
     float q[HEAD_DIM];
-    if (active) for (int d = 0; d < HEAD_DIM; d++)
-        q[d] = Q[row * HEAD_DIM + d] * scale;
+    if (active) 
+        for (int d = 0; d < HEAD_DIM; d++)
+            q[d] = Q[row * HEAD_DIM + d] * scale;
 
     float max_score = -INFINITY;
     float weight_sum = 0.0f;
@@ -56,18 +55,43 @@ __global__ void attention(
         __syncthreads();
     }
 
-    if (active) for (int d = 0; d < HEAD_DIM; d++)
-        O[row * HEAD_DIM + d] = out[d] / weight_sum;
+    if (active) 
+        for (int d = 0; d < HEAD_DIM; d++)
+            O[row * HEAD_DIM + d] = out[d] / weight_sum;
 }
 
-float runAttention(QKV* m, const std::vector<Tile>& tiles) {
+__global__ void precomputedAttention(
+    const float* Q, 
+    const float* K, 
+    const float* V,
+    float* O, 
+    const Tile* tiles,
+    const int* schedule
+) {
+    __shared__ float K_shared[TILE_ROWS * HEAD_DIM];
+    __shared__ float V_shared[TILE_ROWS * HEAD_DIM];
+
+    for (int i = schedule[blockIdx.x]; i < schedule[blockIdx.x + 1]; i++) {
+        Tile t = tiles[i];
+        processTile(Q, K, V, O, t, K_shared, V_shared);
+    }
+}
+
+float runPrecomputedAttention(QKV* m, const std::vector<Tile>& tiles, const std::vector<int>& schedule) {
     Tile* tile_data;
-    size_t bytes = tiles.size() * sizeof(Tile);
-    cudaMalloc(&tile_data, bytes);
-    cudaMemcpy(tile_data, tiles.data(), bytes, cudaMemcpyHostToDevice);
+    size_t tile_bytes = tiles.size() * sizeof(Tile);
+    cudaMalloc(&tile_data, tile_bytes);
+    cudaMemcpy(tile_data, tiles.data(), tile_bytes, cudaMemcpyHostToDevice);
+
+    int* schedule_data;
+    size_t schedule_bytes = schedule.size() * sizeof(int);
+    cudaMalloc(&schedule_data, schedule_bytes);
+    cudaMemcpy(schedule_data, schedule.data(), schedule_bytes, cudaMemcpyHostToDevice);
+
+    int num_blocks = (int)schedule.size() - 1;
 
     // run kernel once for GPU clock ramp-up
-    attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
+    precomputedAttention<<<num_blocks, TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data, schedule_data);
     cudaDeviceSynchronize();
 
     cudaEvent_t start, stop;
@@ -76,7 +100,7 @@ float runAttention(QKV* m, const std::vector<Tile>& tiles) {
 
     cudaEventRecord(start);
     for (int r = 0; r < RUNS; r++)
-        attention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
+        precomputedAttention<<<num_blocks, TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data, schedule_data);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -87,5 +111,45 @@ float runAttention(QKV* m, const std::vector<Tile>& tiles) {
     cudaEventDestroy(stop);
 
     cudaFree(tile_data);
+    cudaFree(schedule_data);
     return ms / RUNS;
+}
+
+// float runOnlineAttention(QKV* m, const std::vector<Tile>& tiles) {
+//     Tile* tile_data;
+//     size_t bytes = tiles.size() * sizeof(Tile);
+//     cudaMalloc(&tile_data, bytes);
+//     cudaMemcpy(tile_data, tiles.data(), bytes, cudaMemcpyHostToDevice);
+
+//     // run kernel once for GPU clock ramp-up
+//     onlineAttention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
+//     cudaDeviceSynchronize();
+
+//     cudaEvent_t start, stop;
+//     cudaEventCreate(&start);
+//     cudaEventCreate(&stop);
+
+//     cudaEventRecord(start);
+//     for (int r = 0; r < RUNS; r++)
+//         onlineAttention<<<tiles.size(), TILE_ROWS>>>(m->q, m->k, m->v, m->o, tile_data);
+//     cudaEventRecord(stop);
+//     cudaEventSynchronize(stop);
+
+//     float ms;
+//     cudaEventElapsedTime(&ms, start, stop);
+
+//     cudaEventDestroy(start);
+//     cudaEventDestroy(stop);
+
+//     cudaFree(tile_data);
+//     return ms / RUNS;
+// }
+
+int maxBlocks() {
+    int dev, per_sm;
+    cudaDeviceProp prop;
+    cudaGetDevice(&dev);
+    cudaGetDeviceProperties(&prop, dev);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&per_sm, precomputedAttention, TILE_ROWS, 0);
+    return prop.multiProcessorCount * per_sm;
 }
