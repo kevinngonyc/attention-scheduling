@@ -16,10 +16,10 @@ for folder in sorted(Path("data").iterdir()):
         if not subfolder.is_dir():
             continue
         cu = load(subfolder, "cu_seqlens.bin", np.int32)
-        q = load(subfolder, "q.bin", np.float16, d_k).float()
-        k = load(subfolder, "k.bin", np.float16, d_k).float()
-        v = load(subfolder, "v.bin", np.float16, d_v).float()
-        o = load(subfolder, "o.bin", np.float16, d_v).float()
+        q = load(subfolder, "q.bin", np.float32, d_k).float()
+        k = load(subfolder, "k.bin", np.float32, d_k).float()
+        v = load(subfolder, "v.bin", np.float32, d_v).float()
+        o = load(subfolder, "o.bin", np.float32, d_v).float()
 
         ref = torch.empty(q.shape[0], d_v)
         for i in range(len(cu) - 1):

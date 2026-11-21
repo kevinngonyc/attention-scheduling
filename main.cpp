@@ -2,6 +2,7 @@
 #include <string>
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 #include "generate.h"
 #include "workload.h"
 #include "attention.h"
@@ -19,7 +20,7 @@ int main(int argc, char** argv) {
     std::filesystem::create_directories(output_dir);
 
     FILE* csv = fopen((output_dir + "/kernel_times.csv").c_str(), "w");
-    fprintf(csv, "workload,num_seqs,num_tiles,skew,naive,lpt\n");
+    fprintf(csv, "workload,num_seqs,num_tiles,imbalance,naive,lpt\n");
 
     std::vector<std::vector<int>> workloads = readWorkloads(input_path);
 
@@ -27,22 +28,15 @@ int main(int argc, char** argv) {
         const std::vector<int>& seqlens = workloads[w];
         printf("\nRunning Workload %zu...\n", w);
 
-        // sample skewness: n / ((n-1)(n-2)) * sum(((x - mean) / s)^3)
-        double n = seqlens.size();
-        double mean = 0;
-        for (int x : seqlens) mean += x;
-        mean /= n;
-
-        double var = 0;
-        for (int x : seqlens) var += (x - mean) * (x - mean);
-        double sd = sqrt(var / (n - 1));
-
-        double cubes = 0;
-        for (int x : seqlens) cubes += pow((x - mean) / sd, 3);
-
-        double skew = 0;
-        if (n >= 3 && sd > 0)
-            skew = n / ((n - 1) * (n - 2)) * cubes;
+        // imbalance: longest sequence length / mean sequence length.
+        // 1.0 means all sequences are the same length; larger means a few long
+        // sequences dominate. (Unlike skewness, this grows with the long/short ratio.)
+        double total_len = 0, max_len = 0;
+        for (int len : seqlens) {
+            total_len += len;
+            max_len = std::max(max_len, (double)len);
+        }
+        double imbalance = total_len > 0 ? max_len / (total_len / seqlens.size()) : 0;
 
         std::vector<int> cu_seqlens = makeCuSeqlens(seqlens);
         QKV* m = createQKV(cu_seqlens.data(), (int)seqlens.size());
@@ -57,7 +51,7 @@ int main(int argc, char** argv) {
         printf("Kernel Time (LPT Schedule): %.3f\n", lpt_kernel_time);
 
         fprintf(csv, "%zu,%zu,%zu,%.3f,%.3f,%.3f\n", w, seqlens.size(), tiles.size(),
-                skew, naive_kernel_time, lpt_kernel_time);
+                imbalance, naive_kernel_time, lpt_kernel_time);
 
         std::string qkv_output = output_dir + "/workload_" + std::to_string(w);
         std::filesystem::create_directories(qkv_output);
