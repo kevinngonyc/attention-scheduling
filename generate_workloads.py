@@ -36,3 +36,8 @@ write("edge", [[8], [64, 128], [65, 129], [1, 100, 2, 200, 3, 300]])
 write("skew", [bimodal(64, r, 0.05) for r in [1, 2, 4, 8, 16, 32]])
 write("frac", [bimodal(64, 32, f) for f in [0.02, 0.05, 0.1, 0.25, 0.5]])
 write("batch", [random_range(b, 64, 2048) for b in [8, 16, 32, 64, 128, 256]])
+
+SHORTS = sorted(random.randint(16, 128) for _ in range(512))
+LONG_TILES = [4, 8, 16, 32, 64, 128]
+write("ascending", [SHORTS + [64 * k] for k in LONG_TILES])
+write("descending", [[64 * k] + SHORTS[::-1] for k in LONG_TILES])

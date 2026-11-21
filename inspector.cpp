@@ -13,7 +13,7 @@ std::vector<int> naiveSchedule(int num_tiles) {
 }
 
 std::vector<int> lptSchedule(std::vector<Tile>& tiles, int num_blocks) {
-    std::sort(tiles.rbegin(), tiles.rend());
+    std::stable_sort(tiles.rbegin(), tiles.rend());
 
     std::vector<std::vector<Tile>> blocks(num_blocks);
     using Entry = std::pair<int, int>;

@@ -29,8 +29,6 @@ int main(int argc, char** argv) {
         printf("\nRunning Workload %zu...\n", w);
 
         // imbalance: longest sequence length / mean sequence length.
-        // 1.0 means all sequences are the same length; larger means a few long
-        // sequences dominate. (Unlike skewness, this grows with the long/short ratio.)
         double total_len = 0, max_len = 0;
         for (int len : seqlens) {
             total_len += len;
@@ -45,8 +43,10 @@ int main(int argc, char** argv) {
         std::vector<int> naive_schedule = naiveSchedule((int)tiles.size());
         float naive_kernel_time = runPrecomputedAttention(m, tiles, naive_schedule);
         printf("Kernel Time (Naive Schedule): %.3f\n", naive_kernel_time);
-
-        std::vector<int> lpt_schedule = lptSchedule(tiles, maxBlocks());
+        
+        int max_blocks = maxBlocks();
+        printf("Max Blocks: %d\n", max_blocks);
+        std::vector<int> lpt_schedule = lptSchedule(tiles, max_blocks);
         float lpt_kernel_time = runPrecomputedAttention(m, tiles, lpt_schedule);
         printf("Kernel Time (LPT Schedule): %.3f\n", lpt_kernel_time);
 
