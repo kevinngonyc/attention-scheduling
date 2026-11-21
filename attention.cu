@@ -2,7 +2,7 @@
 #include "workload.h"
 #include "utils.h"
 #include "qkv.cuh"
-#define RUNS 20
+#define RUNS 100
 
 __device__ void processTile(
     const float* Q, 
