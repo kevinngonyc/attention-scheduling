@@ -41,12 +41,16 @@ int main(int argc, char** argv) {
         std::vector<Tile> tiles = makeTiles(cu_seqlens);
 
         std::vector<int> naive_schedule = naiveSchedule((int)tiles.size());
+        runSMInfoAttention(m, tiles, naive_schedule,
+            output_dir + "/sm_info_w_" + std::to_string(w) + "_naive.csv");
         float naive_kernel_time = runPrecomputedAttention(m, tiles, naive_schedule);
         printf("Kernel Time (Naive Schedule): %.3f\n", naive_kernel_time);
         
         int max_blocks = maxBlocks();
         printf("Max Blocks: %d\n", max_blocks);
         std::vector<int> lpt_schedule = lptSchedule(tiles, max_blocks);
+        runSMInfoAttention(m, tiles, lpt_schedule,
+            output_dir + "/sm_info_w_" + std::to_string(w) + "_lpt.csv");
         float lpt_kernel_time = runPrecomputedAttention(m, tiles, lpt_schedule);
         printf("Kernel Time (LPT Schedule): %.3f\n", lpt_kernel_time);
 
